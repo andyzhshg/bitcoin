@@ -2,14 +2,20 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file license.txt or http://www.opensource.org/licenses/mit-license.php.
 
+/*
+    @up4dev
+    对openssl的BIGNUM进行C++封装，方便使用。
+*/
+
+
 #include <stdexcept>
 #include <vector>
 #include <openssl/bn.h>
 
-
-
-
-
+/*
+    @up4dev
+    BigNum相关的操作会抛出该异常
+*/
 class bignum_error : public std::runtime_error
 {
 public:
@@ -17,7 +23,13 @@ public:
 };
 
 
-
+/*
+    @up4dev
+    openssl的BIGNUM的许多操作会需要传入一个BN_CTX来辅助做动态内存管理(详情请见)[https://wiki.openssl.org/index.php/Manual:BN_CTX_new(3)]。
+    封装主要做了如下几件事：
+    - 在构造函数中构建BN_CTX指针病分配内存，在析构函数中调用释放函数，从而达到内存的自动管理。
+    - 重载取地址(&)，解引用(*)和逻辑非(!)操作符，使得CAutoBN_CTX对象的外部形态跟BN_CTX*是一致的。
+*/
 class CAutoBN_CTX
 {
 protected:
@@ -45,10 +57,17 @@ public:
 };
 
 
-
+/*
+    @up4dev
+    CBigNum派生子openssl的BIGNUM结构体，增加了一系列的操作函数。
+*/
 class CBigNum : public BIGNUM
 {
 public:
+    /*
+        @up4dev 
+        重载构造/拷贝构造/等于操作符/析构函数等，来达到使用CBigNum对象的时候无需考虑初始化和释放等繁琐的工作。
+    */
     CBigNum()
     {
         BN_init(this);
@@ -82,6 +101,10 @@ public:
         BN_clear_free(this);
     }
 
+    /*
+        @up4dev
+        重载类型转换操作符，使得可以将常见的整形变量方便的转换为CBigNum变量
+    */
     CBigNum(char n)             { BN_init(this); if (n >= 0) setulong(n); else setint64(n); }
     CBigNum(short n)            { BN_init(this); if (n >= 0) setulong(n); else setint64(n); }
     CBigNum(int n)              { BN_init(this); if (n >= 0) setulong(n); else setint64(n); }
@@ -127,6 +150,14 @@ public:
 
     void setint64(int64 n)
     {
+        /*
+            @up4dev
+            BN_mpi2bn函数将一个指定格式字符串转换成BIGNUM
+            输入字符串格式规定如下:
+            - 前4个字节合在一起以大端()表示一个数字，数字的大小是数字的长度
+            - 余下的字节代表的是数字的值，最重要的位用来表达正负
+            [参考](https://www.openssl.org/docs/man1.1.0/crypto/BN_mpi2bn.html)
+        */
         unsigned char pch[sizeof(n) + 6];
         unsigned char* p = pch + 4;
         bool fNegative = false;
@@ -144,10 +175,17 @@ public:
             {
                 if (c == 0)
                     continue;
+                /*
+                    @up4dev
+                    因为输出的字符串的第一个字节需要表达数字的符号，但是我们前边又将负数取反为正数，
+                    如果第一个非0字节的首位是1时，要注意处理符号问题。
+                    - 当数字整体是负时，需补一个字节0x80表示符号为负
+                    - 当数字整体式正时，则补一个字节0x00表示符号为正
+                */
                 if (c & 0x80)
                     *p++ = (fNegative ? 0x80 : 0);
                 else if (fNegative)
-                    c |= 0x80;
+                    c |= 0x80;  //@up4dev 对于负数且首位非1，将首位置成1
                 fLeadingZeroes = false;
             }
             *p++ = c;
@@ -230,6 +268,11 @@ public:
         return n;
     }
 
+    /*
+        @up4dev
+        以字符数组的形式初始化BIGNUM的值。
+        [参考](https://www.openssl.org/docs/man1.1.0/crypto/BN_mpi2bn.html)
+    */
     void setvch(const std::vector<unsigned char>& vch)
     {
         std::vector<unsigned char> vch2(vch.size() + 4);
@@ -254,6 +297,11 @@ public:
         return vch;
     }
 
+    /*
+        @up4dev
+        以一个unsigned int的压缩格式来设置BIGNUM，可设置的最大整数是3个字节。
+        @todo 用意是为了节省空间？
+    */
     CBigNum& SetCompact(unsigned int nCompact)
     {
         unsigned int nSize = nCompact >> 24;
@@ -291,11 +339,29 @@ public:
             fNegative = true;
             psz++;
         }
+
+        /*
+            @up4dev
+            @error
+            下面的if代码段和while代码段似乎是反了，因为"- 0x123"显然是合法的，而"-0x 123"则显然是不合法的
+            这段代码无法合理的处理这样的问题。合理的代码应该这样:
+            ```
+            while (isspace(*psz))
+                psz++;
+            if (psz[0] == '0' && tolower(psz[1]) == 'x')
+                psz += 2;
+            ```
+        */
         if (psz[0] == '0' && tolower(psz[1]) == 'x')
             psz += 2;
         while (isspace(*psz))
             psz++;
 
+        /*
+            @up4dev
+            乍一看容易被phexdigit[256]这个大数组吓到，不知道是干什么的，实际这个数组就是一个ASCII表，
+            只是把所有"0123456789ABCDEFabcdef"之外的字符都设成了0，这样后边的代码的意思就容易理解了
+        */
         // hex string to bignum
         static char phexdigit[256] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0, 0,0xa,0xb,0xc,0xd,0xe,0xf,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0xa,0xb,0xc,0xd,0xe,0xf,0,0,0,0,0,0,0,0,0 };
         *this = 0;

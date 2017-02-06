@@ -3,6 +3,22 @@
 // file license.txt or http://www.opensource.org/licenses/mit-license.php.
 
 
+/*
+    @up4dev
+    为什么用base-58而不是base-64呢?中本聪给出了如下的理由
+    - 0OIl在某些字体下看起来容易被混淆，这可能被别有用心的人用来制造钓鱼账号，
+        比如1J7mdg5rbQyUHENYdx39WVWK7fsLpE0OIl和1J7mdg5rbQyUHENYdx39WVWK7fsLpEO0lI
+        就可能看起来特别相像。
+    - 非数字非字母的账号不容易被人所接受，所以字符'+/'没有包含进来。
+    - 没有标点符号，当账号出现在邮件中时，通常不会被展示成换行的形式。
+    - 多数软件双击选择文本时，会选中整个账号而不会被识别成多个词。
+
+    可见中本聪对账号易用，实用都做了比较深入的考虑。
+
+    [Base64](https://zh.wikipedia.org/wiki/Base64)
+    [Base58](https://zh.wikipedia.org/wiki/Base58)
+*/
+
 //
 // Why base-58 instead of standard base-64 encoding?
 // - Don't want 0OIl characters that look the same in some fonts and
@@ -13,6 +29,7 @@
 //
 
 
+//@up4dev 这就base64字符集是去掉了'0IOl+/'这六个字符
 static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 
