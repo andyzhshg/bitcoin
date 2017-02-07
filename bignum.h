@@ -27,7 +27,7 @@ public:
     @up4dev
     openssl的BIGNUM的许多操作会需要传入一个BN_CTX来辅助做动态内存管理(详情请见)[https://wiki.openssl.org/index.php/Manual:BN_CTX_new(3)]。
     封装主要做了如下几件事：
-    - 在构造函数中构建BN_CTX指针病分配内存，在析构函数中调用释放函数，从而达到内存的自动管理。
+    - 在构造函数中构建BN_CTX指针并分配内存，在析构函数中调用释放函数，从而达到内存的自动管理。
     - 重载取地址(&)，解引用(*)和逻辑非(!)操作符，使得CAutoBN_CTX对象的外部形态跟BN_CTX*是一致的。
 */
 class CAutoBN_CTX
