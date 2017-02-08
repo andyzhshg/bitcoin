@@ -14,6 +14,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+ /*
+    @up4dev
+    两个字符串处理函数
+    strlcpy 字符串拷贝
+    strlcat 字符串连接
+    具体代码无需过多解释，知道strncpy和strncat的应该都可以看懂
+ */
+
 /*
  * Copy src to string dst of size siz.  At most siz-1 characters
  * will be copied.  Always NUL terminates (unless siz == 0).

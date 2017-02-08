@@ -26,12 +26,24 @@ void locking_callback(int mode, int i, const char* file, int line)
         ppmutexOpenSSL[i]->Unlock();
 }
 
+/*
+    @up4dev
+    CInit的定义最后紧跟着声明了一个全局变量instance_of_cinit，也就使得程序启动时必然会执行一次构造函数的代码，
+    在构造函数中做了几个初始化的操作：
+    - 初始化openssl的多线程锁
+    - 初始化随机数发生器
+*/
 // Init
 class CInit
 {
 public:
     CInit()
     {
+        /*
+            @up4dev
+            根据openssl的多线程锁的机制做初始化
+            (参考)[http://popozhu.github.io/2013/08/15/openssl%E5%92%8C%E5%A4%9A%E7%BA%BF%E7%A8%8B/]
+        */
         // Init openssl library multithreading support
         ppmutexOpenSSL = (wxMutex**)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(wxMutex*));
         for (int i = 0; i < CRYPTO_num_locks(); i++)
@@ -205,14 +217,30 @@ void ParseString(const string& str, char c, vector<string>& v)
     while (i2 != str.npos);
 }
 
-
+/*
+    @up4dev
+    将钱的数字格式化成更易于阅读的形式
+*/
 string FormatMoney(int64 n, bool fPlus)
 {
-    n /= CENT;
+    n /= CENT;  //@up4dev 归一化到分
+    /*
+        @up4dev 
+        保留两位小数(估计中本聪自己都没有想到比特币的汇率会涨到1000没劲，
+        即使显示到'分'的最小零头也是价值10美金，放在今天，肯定不会只保留两位小数了)
+    */
     string str = strprintf("%"PRI64d".%02"PRI64d, (n > 0 ? n : -n)/100, (n > 0 ? n : -n)%100);
+    /*
+        @up4dev
+        从小数点前三位起，每隔三位数插入一个逗号
+    */
     for (int i = 6; i < str.size(); i += 4)
         if (isdigit(str[str.size() - i - 1]))
             str.insert(str.size() - i, 1, ',');
+    /*
+        @up4dev
+        插入正负符号
+    */
     if (n < 0)
         str.insert((unsigned int)0, 1, '-');
     else if (fPlus && n > 0)
@@ -220,6 +248,10 @@ string FormatMoney(int64 n, bool fPlus)
     return str;
 }
 
+/*
+    @up4dev
+    上面函数的逆过程，将文字形式的钱数值转乘整数形式
+*/
 bool ParseMoney(const char* pszIn, int64& nRet)
 {
     string strWhole;
@@ -266,7 +298,11 @@ bool ParseMoney(const char* pszIn, int64& nRet)
     return true;
 }
 
-
+/*
+    @up4dev
+    16进制数转化成10进制
+    貌似并没有地方用到这个函数
+*/
 vector<unsigned char> ParseHex(const char* psz)
 {
     vector<unsigned char> vch;
@@ -318,7 +354,11 @@ vector<unsigned char> ParseHex(const std::string& str)
     return ParseHex(str.c_str());
 }
 
-
+/*
+    @up4dev
+    解析命令行参数
+    解析的结果存入全局变量mapArgs和mapMultiArgs中
+*/
 void ParseParameters(int argc, char* argv[])
 {
     mapArgs.clear();
@@ -391,8 +431,10 @@ void PrintException(std::exception* pex, const char* pszThread)
 
 
 
-
-
+/*
+    @up4dev
+    获取文件的大小
+*/
 int GetFilesize(FILE* file)
 {
     int nSavePos = ftell(file);
@@ -403,6 +445,11 @@ int GetFilesize(FILE* file)
     return nFilesize;
 }
 
+/*
+    @up4dev
+    取得数据文件目录
+    如果配置了该参数，取得配置的位置；如果没有配置，则在用户的home目录下
+*/
 void GetDataDir(char* pszDir)
 {
     // pszDir must be at least MAX_PATH length.
@@ -448,7 +495,11 @@ string GetDataDir()
 
 
 
-
+/*
+    @up4dev
+    取得大小在 0~nMac 之间的随机数
+    实际是调用openssl的函数RAND_bytes来生成的
+*/
 uint64 GetRand(uint64 nMax)
 {
     if (nMax == 0)
@@ -496,6 +547,11 @@ int64 GetAdjustedTime()
     return GetTime() + nTimeOffset;
 }
 
+/*
+    @up4dev
+    根据其他服务器传来的时间校准自身的时钟
+    在这个版本还没有实现NTP，所以只有这一个比较粗略的方式
+*/
 void AddTimeData(unsigned int ip, int64 nTime)
 {
     int64 nOffsetSample = nTime - GetTime();

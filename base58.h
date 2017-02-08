@@ -29,7 +29,7 @@
 //
 
 
-//@up4dev 这就base64字符集是去掉了'0IOl+/'这六个字符
+//@up4dev 这就base64字符集去掉了'0IOl+/'这六个字符
 static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 

@@ -10,9 +10,17 @@ typedef unsigned __int64  uint64;
 typedef long long  int64;
 typedef unsigned long long  uint64;
 #endif
+
+/*
+    @up4dev
+    这个奇怪的对for的宏定义是为了修复低版本VC中对for语句中声明变量作用域的错误处理，
+    目前较新版本的VC(大概是VS2015及以后)已经没有这个问题。
+    (参考)[http://stackoverflow.com/questions/984878/what-is-the-possible-use-for-define-for-if-false-else-for]
+*/
 #if defined(_MSC_VER) && _MSC_VER < 1300
 #define for  if (false) ; else for
 #endif
+
 #ifndef _MSC_VER
 #define __forceinline  inline
 #endif
@@ -31,6 +39,10 @@ typedef unsigned long long  uint64;
 #endif
 #define snprintf my_snprintf
 
+/*
+    @up4dev
+    printf的格式化占位符在不同平台上的处理
+*/
 #ifndef PRI64d
 #if defined(_MSC_VER) || defined(__BORLANDC__) || defined(__MSVCRT__)
 #define PRI64d  "I64d"
@@ -54,6 +66,10 @@ inline T& REF(const T& val)
     return (T&)val;
 }
 
+/*
+    @up4dev
+    微软平台的一些特殊函数或类型的宏定义，使之可以与unix平台表现一致
+*/
 #ifndef __WXMSW__
 #define _UI64_MAX           UINT64_MAX
 #define _I64_MAX            INT64_MAX
@@ -93,16 +109,29 @@ inline void SetThreadPriority(int nThread, int nPriority) { setpriority(PRIO_PRO
 
 
 
+/*
+    @up4dev
+    一些全局参数的前置声明
+*/
+extern map<string, string> mapArgs;                 //@up4dev 参数列表
+extern map<string, vector<string> > mapMultiArgs;   //@up4dev 参数列表，一对多的参数
+extern bool fDebug;                                 //@up4dev 调试开关
+extern bool fPrintToDebugger;                       //@up4dev 调试输出开关，目前开来只用来控制是否向VC的调试窗口输出调试内容
+extern bool fPrintToConsole;                        //@up4dev 控制台调试输出开关
+extern char pszSetDataDir[MAX_PATH];                //@up4dev 存放数据目录参数(-datadir)        
 
-extern map<string, string> mapArgs;
-extern map<string, vector<string> > mapMultiArgs;
-extern bool fDebug;
-extern bool fPrintToDebugger;
-extern bool fPrintToConsole;
-extern char pszSetDataDir[MAX_PATH];
-
+/*
+    @up4dev
+    该组函数用于随机化随机数发生器的种子
+*/
 void RandAddSeed();
 void RandAddSeedPerfmon();
+
+
+/*
+    @up4dev
+    下边这组函数的相关注释见util.cpp
+*/
 int my_snprintf(char* buffer, size_t limit, const char* format, ...);
 string strprintf(const char* format, ...);
 bool error(const char* format, ...);
@@ -132,7 +161,11 @@ void AddTimeData(unsigned int ip, int64 nTime);
 
 
 
-
+/*
+    @up4dev
+    临界区的包装类
+    区分不同平台的实现，在构造函数和析构函数中做到了自动初始化和释放
+*/
 // Wrapper to automatically initialize critical sections
 class CCriticalSection
 {
@@ -160,6 +193,12 @@ public:
     int nLine;
 };
 
+/*
+    @up4dev
+    自动锁，
+    声明即上锁，离开声明的作用于锁自动释放
+    方便使用，减少因忘记释放引起的死锁情况出现
+*/
 // Automatically leave critical section when leaving block, needed for exception safety
 class CCriticalBlock
 {
@@ -170,6 +209,10 @@ public:
     ~CCriticalBlock() { pcs->Leave(); }
 };
 
+/*
+    @up4dev
+    这个宏用于标识一个互斥的代码段
+*/
 // WARNING: This will catch continue and break!
 // break is caught with an assertion, but there's no way to detect continue.
 // I'd rather be careful than suffer the other more error prone syntax.
@@ -178,6 +221,11 @@ public:
     for (bool fcriticalblockonce=true; fcriticalblockonce; assert(("break caught by CRITICAL_BLOCK!", !fcriticalblockonce)), fcriticalblockonce=false)  \
     for (CCriticalBlock criticalblock(cs); fcriticalblockonce && (cs.pszFile=__FILE__, cs.nLine=__LINE__, true); fcriticalblockonce=false, cs.pszFile=NULL, cs.nLine=0)
 
+/*
+    @up4dev
+    自动的trylock
+    声明即尝试上锁，离开声明的作用于锁自动释放
+*/
 class CTryCriticalBlock
 {
 protected:
@@ -201,8 +249,11 @@ public:
 
 
 
-
-
+/*
+    @up4dev
+    重载的printf
+    将所有printf语句的输出输出到log文件，如果是MS平台的话还可以输出到VC的调试控制台
+*/
 inline int OutputDebugStringF(const char* pszFormat, ...)
 {
     int ret = 0;
@@ -287,7 +338,10 @@ inline int OutputDebugStringF(const char* pszFormat, ...)
 
 
 
-
+/*
+    @up4dev
+    下边是一系列数字和字符串互转的函数
+*/
 
 inline string i64tostr(int64 n)
 {
@@ -322,11 +376,19 @@ inline int atoi(const string& str)
     return atoi(str.c_str());
 }
 
+/*
+    @up4dev
+    浮点数四舍五入取整
+*/
 inline int roundint(double d)
 {
     return (int)(d > 0 ? d + 0.5 : d - 0.5);
 }
 
+/*
+    @up4dev
+    将数组转换为16进制字符串的方式
+*/
 template<typename T>
 string HexStr(const T itbegin, const T itend, bool fSpaces=true)
 {
@@ -407,6 +469,10 @@ inline void heapchk()
 #endif
 }
 
+/*
+    @up4dev
+    @todo 这个宏要干什么和为什么这样干需要进一步理解
+*/
 // Randomize the stack to help protect against buffer overrun exploits
 #define IMPLEMENT_RANDOMIZE_STACK(ThreadFn)                         \
     {                                                               \
@@ -435,7 +501,12 @@ inline void heapchk()
 
 
 
-
+/*
+    @up4dev
+    获取数据的SHA256 hash
+    通过openssl的SHA相关函数进行
+    对输入数据进行了两次SHA256运算
+*/
 template<typename T1>
 inline uint256 Hash(const T1 pbegin, const T1 pend)
 {
@@ -478,6 +549,10 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end,
     return hash2;
 }
 
+/*
+    @up4dev
+    获取对象序列化后的HASH
+*/
 template<typename T>
 uint256 SerializeHash(const T& obj, int nType=SER_GETHASH, int nVersion=VERSION)
 {
@@ -490,6 +565,11 @@ uint256 SerializeHash(const T& obj, int nType=SER_GETHASH, int nVersion=VERSION)
     return Hash(ss.begin(), ss.end());
 }
 
+/*
+    @up4dev
+    获得HASH160
+    首先进行SHA256的计算，然后取上一步计算的哈希再计算HASH160
+*/
 inline uint160 Hash160(const vector<unsigned char>& vch)
 {
     uint256 hash1;

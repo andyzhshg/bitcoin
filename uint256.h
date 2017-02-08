@@ -19,6 +19,11 @@ typedef unsigned long long  uint64;
 inline int Testuint256AdHoc(vector<string> vArg);
 
 
+/*
+    @up4dev
+    通用整数模板类
+    支持常见的算数操作，比较操作，并且可以与标准的整形(uint64)直接进行算数和比较操作
+*/
 
 // We have to keep a separate base class without constructors
 // so the compiler will let us use it in a union
@@ -313,6 +318,11 @@ public:
         while (isspace(*psz))
             psz++;
 
+        /*
+            @up4dev
+            乍一看容易被phexdigit[256]这个大数组吓到，不知道是干什么的，实际这个数组就是一个ASCII表，
+            只是把所有"0123456789ABCDEFabcdef"之外的字符都设成了0，这样后边的代码的意思就容易理解了
+        */
         // hex string to uint
         static char phexdigit[256] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0, 0,0xa,0xb,0xc,0xd,0xe,0xf,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0xa,0xb,0xc,0xd,0xe,0xf,0,0,0,0,0,0,0,0,0 };
         const char* pbegin = psz;

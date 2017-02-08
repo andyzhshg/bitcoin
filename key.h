@@ -26,7 +26,10 @@
 // see www.keylength.com
 // script supports up to 75 for single byte push
 
-
+/*
+    @up4dev
+    对openssl的相关功能进行封装，主要是封装签名和签名验证功能
+*/
 
 class key_error : public std::runtime_error
 {
@@ -34,7 +37,9 @@ public:
     explicit key_error(const std::string& str) : std::runtime_error(str) {}
 };
 
-
+/*
+    @up4dev 字符串数组形式的私钥
+*/
 // secure_allocator is defined in serialize.h
 typedef vector<unsigned char, secure_allocator<unsigned char> > CPrivKey;
 
@@ -49,6 +54,11 @@ protected:
 public:
     CKey()
     {
+        /*
+            @up4dev
+            比特币采用了secp256k1的椭圆曲线加密
+            (参考)[https://en.bitcoin.it/wiki/Secp256k1]
+        */
         pkey = EC_KEY_new_by_curve_name(NID_secp256k1);
         if (pkey == NULL)
             throw key_error("CKey::CKey() : EC_KEY_new_by_curve_name failed");
@@ -81,6 +91,10 @@ public:
         return !fSet;
     }
 
+    /*
+        @up4dev
+        生成一个新的KEY
+    */
     void MakeNewKey()
     {
         if (!EC_KEY_generate_key(pkey))
@@ -88,6 +102,10 @@ public:
         fSet = true;
     }
 
+    /*
+        @up4dev
+        设置私钥
+    */
     bool SetPrivKey(const CPrivKey& vchPrivKey)
     {
         const unsigned char* pbegin = &vchPrivKey[0];
@@ -97,6 +115,10 @@ public:
         return true;
     }
 
+    /*
+        @up4dev
+        获取私钥
+    */
     CPrivKey GetPrivKey() const
     {
         unsigned int nSize = i2d_ECPrivateKey(pkey, NULL);
@@ -109,6 +131,10 @@ public:
         return vchPrivKey;
     }
 
+    /*
+        @up4dev
+        设置公钥
+    */
     bool SetPubKey(const vector<unsigned char>& vchPubKey)
     {
         const unsigned char* pbegin = &vchPubKey[0];
@@ -118,6 +144,10 @@ public:
         return true;
     }
 
+    /*
+        @up4dev
+        获取公钥
+    */
     vector<unsigned char> GetPubKey() const
     {
         unsigned int nSize = i2o_ECPublicKey(pkey, NULL);
@@ -130,6 +160,10 @@ public:
         return vchPubKey;
     }
 
+    /*
+        @up4dev
+        签名
+    */
     bool Sign(uint256 hash, vector<unsigned char>& vchSig)
     {
         vchSig.clear();
@@ -142,6 +176,10 @@ public:
         return true;
     }
 
+    /*
+        @up4dev
+        签名验证
+    */
     bool Verify(uint256 hash, const vector<unsigned char>& vchSig)
     {
         // -1 = error, 0 = bad sig, 1 = good
@@ -150,6 +188,10 @@ public:
         return true;
     }
 
+    /*
+        @up4dev
+        用传入的私钥签名
+    */
     static bool Sign(const CPrivKey& vchPrivKey, uint256 hash, vector<unsigned char>& vchSig)
     {
         CKey key;
@@ -158,6 +200,10 @@ public:
         return key.Sign(hash, vchSig);
     }
 
+    /*
+        @up4dev
+        用传入的公钥进行签名验证
+    */
     static bool Verify(const vector<unsigned char>& vchPubKey, uint256 hash, const vector<unsigned char>& vchSig)
     {
         CKey key;
