@@ -35,10 +35,24 @@ static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnop
 
 inline string EncodeBase58(const unsigned char* pbegin, const unsigned char* pend)
 {
+    /*
+        @up4dev
+        转换base的主要思想就是将源字符串是做一个大整数(BigNum)，
+        然后对这个大整数连续除以58取余数，
+        这一些列的余数就是转换后的结果。
+    */
     CAutoBN_CTX pctx;
     CBigNum bn58 = 58;
     CBigNum bn0 = 0;
 
+    /*
+        @up4dev 
+        将输入字符串反转，并在最后补零
+        反转是因为CBigNum.setvch需要输入的是小端的数据(实际上setvch中调用的openssl的函数BN_mpi2bn需要的输入是大端的，
+        但是在setvch中已经做了处理，具体实现可以参考CBigNum的实现)；
+        末尾补零是因为字符串整体会被作为大整数处理，如果字符串的首字节首位是1，
+        则这个数会被作为负数处理，末尾补零则是人为的将其设为正数
+    */
     // Convert big endian data to little endian
     // Extra zero at the end make sure bignum will interpret as a positive number
     vector<unsigned char> vchTmp(pend-pbegin+1, 0);
@@ -50,11 +64,23 @@ inline string EncodeBase58(const unsigned char* pbegin, const unsigned char* pen
 
     // Convert bignum to string
     string str;
+    /*
+        @up4dev
+        按预估的转换后的字符串长度来预先分配内存
+        Base58编码可以表示的比特位数为以2为底58的对数，这个值约等于5.858，原始编码可以表达8比特位，
+        则边编码后的长度大概为原来的 8/5.858=1.37 倍，安全起见，取1.38倍，并多一个字符。
+        (参考)[https://zh.wikipedia.org/wiki/Base58]
+    */
     str.reserve((pend - pbegin) * 138 / 100 + 1);
     CBigNum dv;
     CBigNum rem;
     while (bn > bn0)
     {
+        /*
+            @up4dev
+            BN_div 对bn除以bn58得到商dv和余数rem，余数计入结果，商赋值为bn继续循环计算
+            (参考)[https://wiki.openssl.org/index.php/Manual:BN_add(3)]
+        */
         if (!BN_div(&dv, &rem, &bn, &bn58, pctx))
             throw bignum_error("EncodeBase58 : BN_div failed");
         bn = dv;
@@ -62,6 +88,10 @@ inline string EncodeBase58(const unsigned char* pbegin, const unsigned char* pen
         str += pszBase58[c];
     }
 
+    /*
+        @up4dev
+        由于前置的0全部在大整数转换的时候被忽略，这里对其做补全的特殊处理
+    */
     // Leading zeroes encoded as base58 zeros
     for (const unsigned char* p = pbegin; p < pend && *p == 0; p++)
         str += pszBase58[0];
@@ -83,31 +113,40 @@ inline bool DecodeBase58(const char* psz, vector<unsigned char>& vchRet)
     CBigNum bn58 = 58;
     CBigNum bn = 0;
     CBigNum bnChar;
+
+    /*
+        @up4dev
+        首先忽略到所有的前导空格
+    */
     while (isspace(*psz))
         psz++;
 
     // Convert big endian string to bignum
     for (const char* p = psz; *p; p++)
     {
+        /*
+            @up4dev
+            在base58词汇表中查找字符
+        */
         const char* p1 = strchr(pszBase58, *p);
         if (p1 == NULL)
         {
-            while (isspace(*p))
+            while (isspace(*p)) //@up4dev 过滤空格
                 p++;
             if (*p != '\0')
                 return false;
             break;
         }
-        bnChar.setulong(p1 - pszBase58);
-        if (!BN_mul(&bn, &bn, &bn58, pctx))
+        bnChar.setulong(p1 - pszBase58);    //@up4dev 这是base58之后的数值(不是字符值)
+        if (!BN_mul(&bn, &bn, &bn58, pctx)) //@up4dev 进行编码时的逆运算，做乘法
             throw bignum_error("DecodeBase58 : BN_mul failed");
         bn += bnChar;
     }
 
     // Get bignum as little endian data
-    vector<unsigned char> vchTmp = bn.getvch();
+    vector<unsigned char> vchTmp = bn.getvch(); //@up4dev 从BigNum中取回编码前字符串
 
-    // Trim off sign byte if present
+    // Trim off sign byte if present    //@up4dev 如果存在人为添加的符号字节，则去掉
     if (vchTmp.size() >= 2 && vchTmp.end()[-1] == 0 && vchTmp.end()[-2] >= 0x80)
         vchTmp.erase(vchTmp.end()-1);
 
