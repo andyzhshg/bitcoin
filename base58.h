@@ -169,7 +169,12 @@ inline bool DecodeBase58(const string& str, vector<unsigned char>& vchRet)
 
 
 
-
+/*
+    @up4dev
+    首先计算字符串的hash
+    将hash字符串的前4字节接至源字符串的末尾
+    将带hash的字符串做base58编码
+*/
 inline string EncodeBase58Check(const vector<unsigned char>& vchIn)
 {
     // add 4-byte hash check to the end
@@ -179,6 +184,13 @@ inline string EncodeBase58Check(const vector<unsigned char>& vchIn)
     return EncodeBase58(vch);
 }
 
+/*
+    @up4dev
+    上面函数的逆过程
+    base58解码
+    计算除最后4字节的字符串的hash
+    将计算所得hash前4字节做验证
+*/
 inline bool DecodeBase58Check(const char* psz, vector<unsigned char>& vchRet)
 {
     if (!DecodeBase58(psz, vchRet))
@@ -210,6 +222,12 @@ inline bool DecodeBase58Check(const string& str, vector<unsigned char>& vchRet)
 
 static const unsigned char ADDRESSVERSION = 0;
 
+/*
+    @up4dev
+    将hash160(160位大整数)转换为地址字符串
+    首字节是版本号，最终的地址字符串是base58加上校验的字符串的形式。
+    目前的版本号是0，编码后显示的结果即是1开头的字符串
+*/
 inline string Hash160ToAddress(uint160 hash160)
 {
     // add 1-byte version number to the front
@@ -218,6 +236,11 @@ inline string Hash160ToAddress(uint160 hash160)
     return EncodeBase58Check(vch);
 }
 
+/*
+    @up4dev
+    地址转换为hash160
+    会做版本和校验位的合法性判断
+*/
 inline bool AddressToHash160(const char* psz, uint160& hash160Ret)
 {
     vector<unsigned char> vch;
@@ -250,7 +273,10 @@ inline bool IsValidBitcoinAddress(const string& str)
 
 
 
-
+/*
+    @up4dev
+    公钥到地址字符串的转换
+*/
 inline string PubKeyToAddress(const vector<unsigned char>& vchPubKey)
 {
     return Hash160ToAddress(Hash160(vchPubKey));

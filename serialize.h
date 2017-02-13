@@ -43,6 +43,14 @@ enum
     SER_BLOCKHEADERONLY = (1 << 17),
 };
 
+/*
+    @up4dev
+    这段宏定义会展开成3个函数
+    GetSerializeSize    获取序列化后的大小
+    Serialize           序列化
+    Unserialize         反序列化
+*/
+
 #define IMPLEMENT_SERIALIZE(statements)    \
     unsigned int GetSerializeSize(int nType=0, int nVersion=VERSION) const  \
     {                                           \
@@ -78,12 +86,23 @@ enum
         {statements}                            \
     }
 
+/*
+    @up4dev
+    READWRITE宏中最有意思的是参数ser_action，它用于标识这个用用来做什么操作(计算大小/序列化/反序列化)，
+    可以看到下文中根据ser_action类型的不同有三个不同的SerReadWrite函数的重载实现，
+    而这个宏的调用是包含在上边的IMPLEMENT_SERIALIZE的使用场景中的，而IMPLEMENT_SERIALIZE宏的三个不同的函数
+    在一开始就分别定义了三个不同类型的ser_action，这就使得在不同的场景下可以调用不同的SerReadWrite函数。
+*/
 #define READWRITE(obj)      (nSerSize += ::SerReadWrite(s, (obj), nType, nVersion, ser_action))
 
 
 
 
 
+/*
+    @up4dev
+    基础类型的(计算大小/序列化/反序列化函数)
+*/
 
 //
 // Basic types
@@ -244,7 +263,11 @@ uint64 ReadCompactSize(Stream& is)
 }
 
 
-
+/*
+    @up4dev
+    数组和基础数据类型(POD Plain Old Data)的序列化封装类和宏
+    (参考)[https://zh.wikipedia.org/wiki/POD_(%E7%A8%8B%E5%BA%8F%E8%AE%BE%E8%AE%A1)]
+*/
 //
 // Wrapper for serializing arrays and POD
 // There's a clever template way to make arrays serialize normally, but MSVC6 doesn't support it
@@ -281,7 +304,10 @@ public:
 };
 
 
-
+/*
+    @up4dev
+    定长字符串的序列化操作封装
+*/
 //
 // string stored as a fixed length field
 //
@@ -328,6 +354,11 @@ public:
 // Forward declarations
 //
 
+/*
+    @up4dev
+    string/vector/pair/map/set的序列化操作封装
+*/
+
 // string
 template<typename C> unsigned int GetSerializeSize(const basic_string<C>& str, int, int=0);
 template<typename Stream, typename C> void Serialize(Stream& os, const basic_string<C>& str, int, int=0);
@@ -367,7 +398,12 @@ template<typename Stream, typename K, typename Pred, typename A> void Unserializ
 
 
 
-
+/*
+    @up4dev
+    如果上面定义版本的GetSerializeSize/Serialize/Unserialize均无法本匹配，
+    下边这组泛型函数将会被匹配，前提是T实现了GetSerializeSize/Serialize/Unserialize成员函数，
+    调用IMPLEMENT_SERIALIZE的类其实是通过这个宏实现了这三个函数
+*/
 //
 // If none of the specialized versions above matched, default to calling member function.
 // "int nType" is changed to "long nType" to keep from getting an ambiguous overload error.
@@ -682,7 +718,10 @@ struct ser_streamplaceholder
 
 
 
-
+/*
+    @up4dev
+    重载的内存管理器，区别是在析构的时候会将内存全部置0
+*/
 //
 // Allocator that clears its contents before deletion
 //
@@ -713,7 +752,11 @@ struct secure_allocator : public std::allocator<T>
 };
 
 
-
+/*
+    @up4dev
+    CDataStream整合了vector和stream两类接口
+    填入数据耗时是线性时间复杂度的
+*/
 //
 // Double ended buffer combining vector and stream-like interfaces.
 // >> and << read and write unformatted data using the above serialization templates.
@@ -1065,7 +1108,11 @@ int main(int argc, char *argv[])
 
 
 
-
+/*
+    @up4dev
+    对FILE文件指针的封装
+    主要是当类析构的时候会自动的关闭文件指针，避免泄露
+*/
 //
 // Automatic closing wrapper for FILE*
 //  - Will automatically close the file when it goes out of scope if not null.
