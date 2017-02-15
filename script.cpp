@@ -33,7 +33,10 @@ void MakeSameSize(valtype& vch1, valtype& vch2)
 }
 
 
-
+/*
+    @up4dev
+    (参考)[https://zh.wikipedia.org/wiki/Forth]
+*/
 //
 // Script is a stack machine (like Forth) that evaluates a predicate
 // returning a bool indicating valid or not.  There are no loops.
@@ -67,6 +70,14 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
         if (!script.GetOp(pc, opcode, vchPushValue))
             return false;
 
+        /*
+            @up4dev
+            IF类语句的执行逻辑
+            只有IF类的操作，在fExec为false时有可能进到这个switch循环中
+            (由OP_IF <= opcode && opcode <= OP_ENDIF决定)，
+            所以当进入IF语句，并且fExec为false时，IF判断为false时IF之后的代码段和
+            IF判断为true时的ELSE代码段里的代码是被跳过不执行的
+        */
         if (fExec && opcode <= OP_PUSHDATA4)
             stack.push_back(vchPushValue);
         else if (fExec || (OP_IF <= opcode && opcode <= OP_ENDIF))
@@ -93,6 +104,11 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_15:
             case OP_16:
             {
+                /*
+                    @up4dev
+                    (int)opcode - (int)(OP_1 - 1)将OP_1NEGATE~OP_16
+                    转换为对应的真实数字，并作为CBigNum入栈
+                */
                 // ( -- value)
                 CBigNum bn((int)opcode - (int)(OP_1 - 1));
                 stack.push_back(bn.getvch());
@@ -108,11 +124,11 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_VER:
             {
+                //@up4dev 将版本号入栈
                 CBigNum bn(VERSION);
                 stack.push_back(bn.getvch());
             }
             break;
-
             case OP_IF:
             case OP_NOTIF:
             case OP_VERIF:
@@ -122,6 +138,12 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
                 bool fValue = false;
                 if (fExec)
                 {
+                    /*
+                        @up4dev
+                        if类的判断操作符
+                        OP_IF/OP_NOTIF 判断栈顶元素的真假
+                        OP_VERIF/OP_VERNOTIF 栈顶元素是版本号，判断是否满足当前版本
+                    */
                     if (stack.size() < 1)
                         return false;
                     valtype& vch = stacktop(-1);
@@ -129,6 +151,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
                         fValue = (CBigNum(VERSION) >= CBigNum(vch));
                     else
                         fValue = CastToBool(vch);
+                    //@up4dev not类的操作，对结果取反
                     if (opcode == OP_NOTIF || opcode == OP_VERNOTIF)
                         fValue = !fValue;
                     stack.pop_back();
@@ -139,6 +162,11 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_ELSE:
             {
+                /*
+                    @up4dev
+                    如果是eles语句，则前边一定会执行过if类的语句，
+                    这里将栈顶元素反转
+                */
                 if (vfExec.empty())
                     return false;
                 vfExec.back() = !vfExec.back();
@@ -147,6 +175,10 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_ENDIF:
             {
+                /*
+                    @up4dev
+                    if语句结束，弹出栈顶元素
+                */
                 if (vfExec.empty())
                     return false;
                 vfExec.pop_back();
@@ -155,6 +187,10 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_VERIFY:
             {
+                /*
+                    @up4dev
+                    验证栈顶元素的真值，如果为真继续，为假退出脚本执行
+                */
                 // (true -- ) or
                 // (false -- false) and return
                 if (stack.size() < 1)
@@ -169,6 +205,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_RETURN:
             {
+                //@up4dev 退出脚本执行
                 pc = pend;
             }
             break;
@@ -179,6 +216,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             //
             case OP_TOALTSTACK:
             {
+                //@up4dev 将正式栈栈顶元素弹出并压入备用栈
                 if (stack.size() < 1)
                     return false;
                 altstack.push_back(stacktop(-1));
@@ -188,6 +226,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_FROMALTSTACK:
             {
+                //@up4dev 将备用栈栈顶元素弹出并压入正式栈
                 if (altstack.size() < 1)
                     return false;
                 stack.push_back(altstacktop(-1));
@@ -197,6 +236,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_2DROP:
             {
+                //@up4dev 弹出两个栈顶元素
                 // (x1 x2 -- )
                 stack.pop_back();
                 stack.pop_back();
@@ -205,6 +245,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_2DUP:
             {
+                //@up4dev 将两个栈顶元素复制一份再放入栈顶
                 // (x1 x2 -- x1 x2 x1 x2)
                 if (stack.size() < 2)
                     return false;
@@ -217,6 +258,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_3DUP:
             {
+                //@up4dev 将三个栈顶元素复制一份再放入栈顶
                 // (x1 x2 x3 -- x1 x2 x3 x1 x2 x3)
                 if (stack.size() < 3)
                     return false;
@@ -231,6 +273,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_2OVER:
             {
+                //@up4dev 将栈顶3、4位置的元素复制一份再放入栈顶
                 // (x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2)
                 if (stack.size() < 4)
                     return false;
@@ -243,6 +286,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_2ROT:
             {
+                //@up4dev 将栈顶5、6位置的元素擦除，再放入栈顶
                 // (x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2)
                 if (stack.size() < 6)
                     return false;
@@ -256,6 +300,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_2SWAP:
             {
+                //@up4dev 将栈顶3、4位置的元素与1、2位置的元素交换位置
                 // (x1 x2 x3 x4 -- x3 x4 x1 x2)
                 if (stack.size() < 4)
                     return false;
@@ -266,6 +311,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_IFDUP:
             {
+                //@up4dev 如果栈顶元素为真，则复制一份放入栈顶
                 // (x - 0 | x x)
                 if (stack.size() < 1)
                     return false;
@@ -277,6 +323,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_DEPTH:
             {
+                //@up4dev 将栈的高度数值压入栈顶
                 // -- stacksize
                 CBigNum bn(stack.size());
                 stack.push_back(bn.getvch());
@@ -285,6 +332,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_DROP:
             {
+                //@up4dev 弹出栈顶元素
                 // (x -- )
                 if (stack.size() < 1)
                     return false;
@@ -294,6 +342,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_DUP:
             {
+                //@up4dev 复制栈顶元素，并放入栈顶
                 // (x -- x x)
                 if (stack.size() < 1)
                     return false;
@@ -304,6 +353,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_NIP:
             {
+                //@up4dev 擦除栈顶第2位置的元素
                 // (x1 x2 -- x2)
                 if (stack.size() < 2)
                     return false;
@@ -313,6 +363,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_OVER:
             {
+                //@up4dev 将栈顶第2位置的元素复制一份再放入栈顶
                 // (x1 x2 -- x1 x2 x1)
                 if (stack.size() < 2)
                     return false;
@@ -324,6 +375,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_PICK:
             case OP_ROLL:
             {
+                //@up4dev 将栈顶第n+1个元素(n是栈顶元素的数值)擦除并替换现在的栈顶元素
                 // (xn ... x2 x1 x0 n - xn ... x2 x1 x0 xn)
                 // (xn ... x2 x1 x0 n - ... x2 x1 x0 xn)
                 if (stack.size() < 2)
@@ -341,6 +393,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_ROT:
             {
+                //@up4dev 将栈顶第3位置的元素擦除再压入栈顶
                 // (x1 x2 x3 -- x2 x3 x1)
                 //  x2 x1 x3  after first swap
                 //  x2 x3 x1  after second swap
@@ -353,6 +406,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_SWAP:
             {
+                //@up4dev 交换栈顶的两个元素
                 // (x1 x2 -- x2 x1)
                 if (stack.size() < 2)
                     return false;
@@ -362,6 +416,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_TUCK:
             {
+                //@up4dev 将栈顶元素复制一份再插入栈顶第2元素之前
                 // (x1 x2 -- x2 x1 x2)
                 if (stack.size() < 2)
                     return false;
@@ -376,6 +431,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             //
             case OP_CAT:
             {
+                //@up4dev 弹出栈顶两个元素，链接二者(原栈顶元素在后)，并将结果压入栈顶
                 // (x1 x2 -- out)
                 if (stack.size() < 2)
                     return false;
@@ -388,6 +444,29 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_SUBSTR:
             {
+                /*
+                    @up4dev
+                    对栈顶第3元素做裁剪操作，裁减掉
+                    栈顶第1元素表示的数字位置之后
+                    栈顶第2元素表示的位置之前的字符
+                    例如栈的内容如下图所示
+                    裁剪前
+                    ------------------
+                    | 8              |<--栈顶
+                    ------------------
+                    | 3              |
+                    ------------------
+                    | 0123456789ABCD |
+                    ------------------
+                    | ...            |
+                    ------------------
+                    裁剪后
+                    ------------------
+                    | 34567          |<--栈顶
+                    ------------------
+                    | ...            |
+                    ------------------
+                */
                 // (in begin size -- out)
                 if (stack.size() < 3)
                     return false;
@@ -410,6 +489,31 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_LEFT:
             case OP_RIGHT:
             {
+                /*
+                    @up4dev
+                    擦除栈顶第2元素左侧或者右侧n个字符，n是栈顶元素的值
+                    执行前
+                    ----------
+                    | 3      | <--栈顶
+                    ----------
+                    | 123456 |
+                    ----------
+                    | ...    |
+                    ----------
+                    执行后
+                    OP_LEFT
+                    ----------
+                    | 456    | <--栈顶
+                    ----------
+                    | ...    |
+                    ----------                    
+                    OP_RIGHT
+                    ----------
+                    | 123    | <--栈顶
+                    ----------
+                    | ...    |
+                    ----------                    
+                */
                 // (in size -- out)
                 if (stack.size() < 2)
                     return false;
@@ -429,6 +533,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_SIZE:
             {
+                //@up4dev 返回栈顶元素的长度，并将长度数值压入栈顶
                 // (in -- in size)
                 if (stack.size() < 1)
                     return false;
@@ -443,6 +548,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             //
             case OP_INVERT:
             {
+                //@up4dev 将栈顶元素作按位取反操作
                 // (in - out)
                 if (stack.size() < 1)
                     return false;
@@ -456,6 +562,7 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_OR:
             case OP_XOR:
             {
+                //@up4dev 将栈顶元素作按位 与/或/异或 操作
                 // (x1 x2 - out)
                 if (stack.size() < 2)
                     return false;
@@ -485,6 +592,11 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_EQUALVERIFY:
             //case OP_NOTEQUAL: // use OP_NUMNOTEQUAL
             {
+                /*
+                    @up4dev 
+                    逻辑等于操作，弹出栈顶两个元素做逻辑等于比较，并将结果放入栈顶
+                    如果是OP_EQUALVERIFY操作，则栈顶不放结果，并且如果不等结束执行脚本
+                */
                 // (x1 x2 - bool)
                 if (stack.size() < 2)
                     return false;
@@ -522,6 +634,18 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_NOT:
             case OP_0NOTEQUAL:
             {
+                /*
+                    @up4dev
+                    单操作数数值操作，操作数为弹出的栈顶元素，结果压入栈顶
+                    OP_1ADD         +=
+                    OP_1SUB         -=
+                    OP_2MUL         乘以2
+                    OP_2DIV         除以2
+                    OP_NEGATE       符号取反
+                    OP_ABS          取绝对值
+                    OP_NOT          判断是否为假(等于0)
+                    OP_0NOTEQUAL    判断是否不等于0
+                */
                 // (in -- out)
                 if (stack.size() < 1)
                     return false;
@@ -561,6 +685,28 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_MIN:
             case OP_MAX:
             {
+                /*
+                    @up4dev
+                    双操作数数值操作，操作数为弹出的栈顶两个元素，结果压入栈顶
+                    OP_ADD                  +
+                    OP_SUB                  -
+                    OP_MUL                  *
+                    OP_DIV                  /
+                    OP_MOD                  取余
+                    OP_LSHIFT               左移位
+                    OP_RSHIFT               右移位
+                    OP_BOOLAND              逻辑与
+                    OP_BOOLOR               逻辑或
+                    OP_NUMEQUAL             判断数值相等
+                    OP_NUMEQUALVERIFY       判断数值相等，不等的话退出脚本执行
+                    OP_NUMNOTEQUAL          判断数值不相等
+                    OP_LESSTHAN             小于
+                    OP_GREATERTHAN          大于
+                    OP_LESSTHANOREQUAL      小于等于
+                    OP_GREATERTHANOREQUAL   大于等于
+                    OP_MIN                  取出较小的数
+                    OP_MAX                  取出较大的数
+                */
                 // (x1 x2 -- out)
                 if (stack.size() < 2)
                     return false;
@@ -632,6 +778,12 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
 
             case OP_WITHIN:
             {
+                /*
+                    @up4dev
+                    弹出栈顶三个元素，并判断第3位置元素是否大小在第1第2元素之间
+                    第2 <= 第3 < 第1
+                    判断结果压入栈顶
+                */
                 // (x min max -- out)
                 if (stack.size() < 3)
                     return false;
@@ -656,6 +808,10 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_HASH160:
             case OP_HASH256:
             {
+                /*
+                    @up4dev
+                    各种HASH操作
+                */
                 // (in -- hash)
                 if (stack.size() < 1)
                     return false;
@@ -692,6 +848,11 @@ bool EvalScript(const CScript& script, const CTransaction& txTo, unsigned int nI
             case OP_CHECKSIG:
             case OP_CHECKSIGVERIFY:
             {
+                /*
+                    @up4dev
+                    检查签名
+                    栈顶的两个元素为公钥和签名
+                */
                 // (sig pubkey -- bool)
                 if (stack.size() < 2)
                     return false;

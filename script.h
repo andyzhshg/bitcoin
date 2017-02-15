@@ -329,6 +329,14 @@ class CScript : public vector<unsigned char>
 protected:
     CScript& push_int64(int64 n)
     {
+        /*
+            @up4dev
+            对于-1或1~16之间(包含)的数字，以单字节的方式保存
+            对于这个区间之外的数字，用CBigNum保存
+            OP_1NEGATE~OP_16定义的是-1~16的整数，
+            其中0因为有OP_0已经定义被跳过但是用OP_RESERVED补位，
+            所以可以用n + (OP_1 - 1)就可以计算n转换到opcodetype之后的数值
+        */
         if (n == -1 || (n >= 1 && n <= 16))
         {
             push_back(n + (OP_1 - 1));
@@ -407,6 +415,12 @@ public:
 
     CScript& operator<<(opcodetype opcode)
     {
+        /*
+            @up4dev
+            opcodetype的序列化以OP_SINGLEBYTE_END(0xF0)为分隔
+            小于OP_SINGLEBYTE_END的记做1字节
+            大于OP_SINGLEBYTE_END的记做2字节
+        */
         if (opcode <= OP_SINGLEBYTE_END)
         {
             insert(end(), (unsigned char)opcode);
