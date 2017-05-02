@@ -629,6 +629,7 @@ bool LoadWallet(bool& fFirstRunRet)
     else
     {
         // Create new keyUser and set as default key
+        //@up4dev 初始化随机数种子
         RandAddSeedPerfmon();
         keyUser.MakeNewKey();
         if (!AddKey(keyUser))

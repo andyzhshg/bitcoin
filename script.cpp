@@ -23,6 +23,12 @@ bool CastToBool(const valtype& vch)
     return (CBigNum(vch) != bnZero);
 }
 
+/*
+    @up4dev
+    输入为两个字符数组
+    本函数按照两个数组中长度较大者的长度来修改长度较小者的长度
+    使二者长度相同
+*/
 void MakeSameSize(valtype& vch1, valtype& vch2)
 {
     // Lengthen the shorter one

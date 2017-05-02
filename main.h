@@ -416,12 +416,14 @@ public:
 
     bool IsNewerThan(const CTransaction& old) const
     {
+        //@up4dev 首先确定比较双方的输入是相同的
         if (vin.size() != old.vin.size())
             return false;
         for (int i = 0; i < vin.size(); i++)
             if (vin[i].prevout != old.vin[i].prevout)
                 return false;
 
+        //@up4dev 比较二者所有输入的nSequence，谁包含最小的nSequence则谁比较新
         bool fNewer = false;
         unsigned int nLowest = UINT_MAX;
         for (int i = 0; i < vin.size(); i++)
@@ -443,6 +445,12 @@ public:
         return fNewer;
     }
 
+    /*
+        @up4dev
+        检查是否是CoinBase
+        (参考)[https://en.bitcoin.it/wiki/Coinbase]
+        CoinBase是指没有输入tx的的tx，也就是区块构建者挖出区块的奖励
+    */
     bool IsCoinBase() const
     {
         return (vin.size() == 1 && vin[0].prevout.IsNull());
@@ -450,10 +458,12 @@ public:
 
     bool CheckTransaction() const
     {
+        //@up4dev 输入输出不能为空
         // Basic checks that don't depend on any context
         if (vin.empty() || vout.empty())
             return error("CTransaction::CheckTransaction() : vin or vout empty");
 
+        //@up4dev 输出数值不能为负，因为不能给他人转账负数的币
         // Check for negative values
         foreach(const CTxOut& txout, vout)
             if (txout.nValue < 0)
@@ -461,11 +471,13 @@ public:
 
         if (IsCoinBase())
         {
+            //@up4dev coinbase的tx的scriptSig是有大小限制的
             if (vin[0].scriptSig.size() < 2 || vin[0].scriptSig.size() > 100)
                 return error("CTransaction::CheckTransaction() : coinbase script size");
         }
         else
         {
+            //@up4dev 非coinbase的tx的输入必须有输入来源
             foreach(const CTxIn& txin, vin)
                 if (txin.prevout.IsNull())
                     return error("CTransaction::CheckTransaction() : prevout is null");
@@ -512,14 +524,16 @@ public:
 
     int64 GetMinFee(bool fDiscount=false) const
     {
+        //@up4dev 1kb/cent，不足1kb部分按1kb算
         // Base fee is 1 cent per kilobyte
         unsigned int nBytes = ::GetSerializeSize(*this, SER_NETWORK);
         int64 nMinFee = (1 + (int64)nBytes / 1000) * CENT;
 
+        //up4dev 区块的前100个交易(小于10k)免费
         // First 100 transactions in a block are free
         if (fDiscount && nBytes < 10000)
             nMinFee = 0;
-
+        //@up4dev 为了防止垃圾输入拖垮网络，对于每一笔小于0.01的输出征收1cent的交易费
         // To limit dust spam, require a 0.01 fee if any output is less than 0.01
         if (nMinFee < CENT)
             foreach(const CTxOut& txout, vout)
@@ -897,6 +911,28 @@ public:
     }
 
 
+    /*
+        @up4dev
+        构建MerkleTree
+        (参考)[http://8btc.com/article-2010-1.html]
+        (参考)[https://en.wikipedia.org/wiki/Merkle_tree]
+        假设输入是下面的列表:
+        0 | 1 | 2 | 3 | 4
+
+        则构建出来的MerkleTree如下图所示:
+              10
+           /      \
+           8       9
+         /   \   /   \
+         5   6   7   7
+        / \ / \ / \        
+        0 1 2 3 4 4
+        
+        内存中实际是存储在数组vMerkleTree中的，其内容如下面的列表:
+        0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+
+        可见最后的结果中，数组最末的就是MerkleTree的根节点
+    */
     uint256 BuildMerkleTree() const
     {
         vMerkleTree.clear();

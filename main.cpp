@@ -37,8 +37,8 @@ map<uint256, CWalletTx> mapWallet;
 vector<uint256> vWalletUpdated;
 CCriticalSection cs_mapWallet;
 
-map<vector<unsigned char>, CPrivKey> mapKeys;
-map<uint160, vector<unsigned char> > mapPubKeys;
+map<vector<unsigned char>, CPrivKey> mapKeys;       //@up4dev 记录钱包中的公钥私钥对
+map<uint160, vector<unsigned char> > mapPubKeys;    //@up4dev 记录钱包中的 uint160-字符串 形式的公钥对
 CCriticalSection cs_mapKeys;
 CKey keyUser;
 
@@ -819,6 +819,7 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, map<uint256, CTxIndex>& mapTestPoo
             if (prevout.n >= txPrev.vout.size() || prevout.n >= txindex.vSpent.size())
                 return error("ConnectInputs() : %s prevout.n out of range %d %d %d prev tx %s\n%s", GetHash().ToString().substr(0,6).c_str(), prevout.n, txPrev.vout.size(), txindex.vSpent.size(), prevout.hash.ToString().substr(0,6).c_str(), txPrev.ToString().c_str());
 
+            //@up4dev 如果prev是coinbase(挖到矿交易)，要检查这笔交易是否已经"成熟"，必须要大于COINBASE_MATURITY个区块
             // If prev is coinbase, check that it's matured
             if (txPrev.IsCoinBase())
                 for (CBlockIndex* pindex = pindexBest; pindex && nBestHeight - pindex->nHeight < COINBASE_MATURITY-1; pindex = pindex->pprev)
@@ -1386,6 +1387,11 @@ bool CheckDiskSpace(int64 nAdditionalBytes)
     return true;
 }
 
+/*
+    @up4dev
+    打开块数据文件
+    保存在数据目录下，命名为 blk0001.dat 形式
+*/
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode)
 {
     if (nFile == -1)
