@@ -682,26 +682,47 @@ int64 CBlock::GetBlockValue(int64 nFees) const
     return nSubsidy + nFees;
 }
 
+/*
+    @up4dev
+    计算下一次PoW的难度
+*/
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast)
 {
+    /* 
+        @up4dev
+        nTargetTimespan 2周的秒数
+        nTargetSpacing  预期一个区块的秒数
+        nInterval       预期的2周产生的区块数目 2016个区块
+    */
     const unsigned int nTargetTimespan = 14 * 24 * 60 * 60; // two weeks
     const unsigned int nTargetSpacing = 10 * 60;
     const unsigned int nInterval = nTargetTimespan / nTargetSpacing;
 
+    // @up4dev 创世区块没有前置区块，直接返回默认难度
     // Genesis block
     if (pindexLast == NULL)
         return bnProofOfWorkLimit.GetCompact();
 
+    // @up4dev 约每两周重新计算并更新一次难度，即只有区块编号是nInterval整数倍时才计算
     // Only change once per interval
     if ((pindexLast->nHeight+1) % nInterval != 0)
         return pindexLast->nBits;
 
+    /*
+        @up4dev
+        回溯至两周前的区块，即当前区块nInterval个之前的区块
+    */
     // Go back by what we want to be 14 days worth of blocks
     const CBlockIndex* pindexFirst = pindexLast;
     for (int i = 0; pindexFirst && i < nInterval-1; i++)
         pindexFirst = pindexFirst->pprev;
     assert(pindexFirst);
 
+    /*
+        @up4dev
+        计算nInterval个区块耗费的实际时间，并与预期的时间作对比
+        下边的两个if应该是为了防止难度剧烈变动，限制只能剩下浮动不超过4倍
+    */
     // Limit adjustment step
     unsigned int nActualTimespan = pindexLast->nTime - pindexFirst->nTime;
     printf("  nActualTimespan = %d  before bounds\n", nActualTimespan);
@@ -710,12 +731,17 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast)
     if (nActualTimespan > nTargetTimespan*4)
         nActualTimespan = nTargetTimespan*4;
 
+    /*
+        @up4dev
+        计算实际的难度： 新难度 = 原难度 * 最近2016区块产生之间 / 目标2016区块产生时间
+    */
     // Retarget
     CBigNum bnNew;
     bnNew.SetCompact(pindexLast->nBits);
     bnNew *= nActualTimespan;
     bnNew /= nTargetTimespan;
 
+    //@up4dev 难度只能变大，不能变小 (bnNew 越小，计算难度越大) (TODO 这里还有疑问，难道真的不能变小？)
     if (bnNew > bnProofOfWorkLimit)
         bnNew = bnProofOfWorkLimit;
 
@@ -1159,38 +1185,47 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 
 
 
-
+/*
+    @up4dev
+    检查区块数据的合法性
+*/
 bool CBlock::CheckBlock() const
 {
     // These are checks that are independent of context
     // that can be verified before saving an orphan block.
 
+    // @up4dev 最少一个交易(挖矿交易coinbase)最多不能超过MAX_SIZE个交易
     // Size limits
     if (vtx.empty() || vtx.size() > MAX_SIZE || ::GetSerializeSize(*this, SER_DISK) > MAX_SIZE)
         return error("CheckBlock() : size limits failed");
 
+    // @up4dev 不能使未来2小时之后的区块
     // Check timestamp
     if (nTime > GetAdjustedTime() + 2 * 60 * 60)
         return error("CheckBlock() : block timestamp too far in the future");
-
+    // @up4dev 第一个交易必须是挖矿交易(coinbase)
     // First transaction must be coinbase, the rest must not be
     if (vtx.empty() || !vtx[0].IsCoinBase())
         return error("CheckBlock() : first tx is not coinbase");
+    // @up4dev 除了第一个交易其他交易都不能是挖矿交易(coinbase)
     for (int i = 1; i < vtx.size(); i++)
         if (vtx[i].IsCoinBase())
             return error("CheckBlock() : more than one coinbase");
 
+    // @up4dev 逐个检查所有交易内部数据的的合法性
     // Check transactions
     foreach(const CTransaction& tx, vtx)
         if (!tx.CheckTransaction())
             return error("CheckBlock() : CheckTransaction failed");
 
+    // @up4dev 区块的难度符合PoW难度要求
     // Check proof of work matches claimed amount
     if (CBigNum().SetCompact(nBits) > bnProofOfWorkLimit)
         return error("CheckBlock() : nBits below minimum work");
+    // @up4dev 检查实际的hash确实满足难度要求
     if (GetHash() > CBigNum().SetCompact(nBits).getuint256())
         return error("CheckBlock() : hash doesn't match nBits");
-
+    // @up4dev 检查MerkleTree是否正确
     // Check merkleroot
     if (hashMerkleRoot != BuildMerkleTree())
         return error("CheckBlock() : hashMerkleRoot mismatch");
