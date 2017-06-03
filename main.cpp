@@ -15,16 +15,16 @@
 
 CCriticalSection cs_main;
 
-map<uint256, CTransaction> mapTransactions;
-CCriticalSection cs_mapTransactions;
+map<uint256, CTransaction> mapTransactions;     //@up4dev 交易列表
+CCriticalSection cs_mapTransactions;            //@up4dev 交易的线程隔离区
 unsigned int nTransactionsUpdated = 0;
 map<COutPoint, CInPoint> mapNextTx;
 
-map<uint256, CBlockIndex*> mapBlockIndex;
-const uint256 hashGenesisBlock("0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f");
-CBlockIndex* pindexGenesisBlock = NULL;
-int nBestHeight = -1;
-uint256 hashBestChain = 0;
+map<uint256, CBlockIndex*> mapBlockIndex;       //@up4dev 区块索引列表
+const uint256 hashGenesisBlock("0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f");   //@up4dev 创世区块hash
+CBlockIndex* pindexGenesisBlock = NULL;         //@up4dev 创世区块
+int nBestHeight = -1;                           //@up4dev 最长链条高度
+uint256 hashBestChain = 0;                      //
 CBlockIndex* pindexBest = NULL;
 
 map<uint256, CBlock*> mapOrphanBlocks;
@@ -1233,23 +1233,31 @@ bool CBlock::CheckBlock() const
     return true;
 }
 
+/*
+    @up4dev
+    接受区块
+*/
 bool CBlock::AcceptBlock()
 {
+    // @up4dev 检查区块是否已经存在
     // Check for duplicate
     uint256 hash = GetHash();
     if (mapBlockIndex.count(hash))
         return error("AcceptBlock() : block already in mapBlockIndex");
 
+    // @up4dev 获取前置区块，前置区块必须存在
     // Get prev block index
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
     if (mi == mapBlockIndex.end())
         return error("AcceptBlock() : prev block not found");
     CBlockIndex* pindexPrev = (*mi).second;
 
+    // @up4dev 时间戳应该小于前一区块的中位时间戳
     // Check timestamp against prev
     if (nTime <= pindexPrev->GetMedianTimePast())
         return error("AcceptBlock() : block's timestamp is too early");
 
+    // @up4dev 检查是否所有的交易都已经finalized(结束？)
     // Check that all transactions are finalized (starting around Dec 2009)
     if (nBestHeight > 31000)
         foreach(const CTransaction& tx, vtx)
@@ -1285,8 +1293,19 @@ bool CBlock::AcceptBlock()
     return true;
 }
 
+/*
+    @up4dev
+    处理某个节点发来的区块数据
+    pfrom   区块发送节点
+    pblock  区块数据
+*/
 bool ProcessBlock(CNode* pfrom, CBlock* pblock)
 {
+    /*
+        @up4dev
+        检查是否已经接收了该区块
+        要检查两个位置mapBlockIndex和mapOrphanBlocks
+    */
     // Check for duplicate
     uint256 hash = pblock->GetHash();
     if (mapBlockIndex.count(hash))
@@ -1294,6 +1313,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     if (mapOrphanBlocks.count(hash))
         return error("ProcessBlock() : already have block (orphan) %s", hash.ToString().substr(0,14).c_str());
 
+    // @up4dev 检查区块的合法性
     // Preliminary checks
     if (!pblock->CheckBlock())
     {
@@ -1301,6 +1321,11 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
         return error("ProcessBlock() : CheckBlock FAILED");
     }
 
+    /*
+        @up4dev
+        如果还没有该区块的前置区块，将其压入mapOrphanBlocks
+        并且向该区块的发送节点索要前置区块
+    */
     // If don't already have its previous block, shunt it off to holding area until we get it
     if (!mapBlockIndex.count(pblock->hashPrevBlock))
     {
@@ -1468,6 +1493,12 @@ FILE* AppendBlockFile(unsigned int& nFileRet)
     }
 }
 
+/*
+    @up4dev
+    加载区块索引
+    如果文件系统已有记录文件，从文件加载
+    如果加载失败并且参数指定要新建创世区块，则创建创世区块
+*/
 bool LoadBlockIndex(bool fAllowNew)
 {
     //
@@ -2335,20 +2366,28 @@ void BlockSHA256(const void* pin, unsigned int nBlocks, void* pout)
     }
 }
 
-
+/*
+    @up4dev
+    挖矿线程工作函数
+*/
 void BitcoinMiner()
 {
     printf("BitcoinMiner started\n");
 
+    //@up4dev 挖矿交易中挖到的比特币的交易密钥，该密钥会在每次挖到区块后更新
     CKey key;
     key.MakeNewKey();
     CBigNum bnExtraNonce = 0;
+    //@up4dev 直到参数fGenerateBitcoins被置为False，该循环都会持续运转来尝试挖取新的区块
     while (fGenerateBitcoins)
     {
+        //@up4dev 将线程的优先级调到最低
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_LOWEST);
         Sleep(50);
+        //@up4dev 检查退出指令
         if (fShutdown)
             return;
+        //@up4dev 检查网络状态，当没有与任何节点相连的时候，等待重连
         while (vNodes.empty())
         {
             Sleep(1000);
@@ -2359,10 +2398,13 @@ void BitcoinMiner()
         }
 
         unsigned int nTransactionsUpdatedLast = nTransactionsUpdated;
+        //@up4dev 切换至最佳(长)链
         CBlockIndex* pindexPrev = pindexBest;
+        //@up4dev 获取下一区块的挖矿难度
         unsigned int nBits = GetNextWorkRequired(pindexPrev);
 
 
+        //@up4dev 构造挖矿交易(coinbase)，该交易包含挖到的比特币，可以用key来解锁消费
         //
         // Create coinbase tx
         //
@@ -2374,16 +2416,18 @@ void BitcoinMiner()
         txNew.vout[0].scriptPubKey << key.GetPubKey() << OP_CHECKSIG;
 
 
+        //@up4dev 创建新区快
         //
         // Create new block
         //
         auto_ptr<CBlock> pblock(new CBlock());
         if (!pblock.get())
             return;
-
+        //@up4dev 将挖矿(coinbase)交易加入区块作为第一个交易
         // Add our coinbase tx as first transaction
         pblock->vtx.push_back(txNew);
 
+        //@up4dev 收集最近的交易并加入区块
         // Collect the latest transactions into the block
         int64 nFees = 0;
         CRITICAL_BLOCK(cs_main)

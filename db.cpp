@@ -307,16 +307,22 @@ bool CTxDB::WriteHashBestChain(uint256 hashBestChain)
     return Write(string("hashBestChain"), hashBestChain);
 }
 
+/*
+    @up4dev
+    插入区块
+*/
 CBlockIndex* InsertBlockIndex(uint256 hash)
 {
     if (hash == 0)
         return NULL;
 
+    // @up4dev 如果区块已经存在，无需重新插入
     // Return existing
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hash);
     if (mi != mapBlockIndex.end())
         return (*mi).second;
 
+    //@up4dev 如果不存在，新建一个区块索引并插入
     // Create new
     CBlockIndex* pindexNew = new CBlockIndex();
     if (!pindexNew)
@@ -327,6 +333,10 @@ CBlockIndex* InsertBlockIndex(uint256 hash)
     return pindexNew;
 }
 
+/*
+    @up4dev
+    从文件数据库加载区块索引
+*/
 bool CTxDB::LoadBlockIndex()
 {
     // Get cursor

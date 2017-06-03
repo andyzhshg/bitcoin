@@ -79,7 +79,11 @@ void BitcoinMiner();
 
 
 
-
+/*
+    @up4dev
+    交易在磁盘上的位置
+    分三个维度，从大到小依次为：文件号 区块位置 交易位置
+*/
 class CDiskTxPos
 {
 public:
@@ -1159,6 +1163,12 @@ public:
 
     enum { nMedianTimeSpan=11 };
 
+    /*
+        @up4dev
+        获取最近几个区块的平均耗时
+        获取最多最近nMedianTimeSpan个区块的时间戳
+        对时间戳排序，取中位数作为平均耗时
+    */
     int64 GetMedianTimePast() const
     {
         unsigned int pmedian[nMedianTimeSpan];
