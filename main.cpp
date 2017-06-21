@@ -672,13 +672,21 @@ uint256 GetOrphanRoot(const CBlock* pblock)
     return pblock->GetHash();
 }
 
+// @up4dev 计算挖到区块的收益
 int64 CBlock::GetBlockValue(int64 nFees) const
 {
+    // @up4dev 初始状况下是50个BTC的收益，每4年减半
     int64 nSubsidy = 50 * COIN;
 
+    /*
+        @up4dev 
+        按平均10分钟出一个区块的速度，
+        4年约有 6 * 24 * 365 * 4 = 210240 个区块。
+        这里的210000应该是一个近似值
+    */
     // Subsidy is cut in half every 4 years
     nSubsidy >>= (nBestHeight / 210000);
-
+    // @up4dev 挖矿奖励还包含交易费
     return nSubsidy + nFees;
 }
 
@@ -794,7 +802,16 @@ bool CTransaction::DisconnectInputs(CTxDB& txdb)
     return true;
 }
 
-
+/*
+    @up4dev
+    连接交易的输入输出
+    txdb            仅在接收区块时用到
+    mapTestPool     仅在挖矿时用到
+    nFees           会将本交易的交易费加到这个变量上返回给调用者
+    fBlock          接受区块时该变量为true
+    fMiner          挖矿计算时该变量为true
+    nMinFee         实现计算好的最小交易费，用于判断交易费是否合理
+*/
 bool CTransaction::ConnectInputs(CTxDB& txdb, map<uint256, CTxIndex>& mapTestPool, CDiskTxPos posThisTx, int nHeight, int64& nFees, bool fBlock, bool fMiner, int64 nMinFee)
 {
     // Take over previous transactions' spent pointers
@@ -845,37 +862,49 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, map<uint256, CTxIndex>& mapTestPoo
             if (prevout.n >= txPrev.vout.size() || prevout.n >= txindex.vSpent.size())
                 return error("ConnectInputs() : %s prevout.n out of range %d %d %d prev tx %s\n%s", GetHash().ToString().substr(0,6).c_str(), prevout.n, txPrev.vout.size(), txindex.vSpent.size(), prevout.hash.ToString().substr(0,6).c_str(), txPrev.ToString().c_str());
 
-            //@up4dev 如果prev是coinbase(挖到矿交易)，要检查这笔交易是否已经"成熟"，必须要大于COINBASE_MATURITY个区块
+            /*
+                @up4dev 
+                如果prev是coinbase(挖到矿交易)，
+                要检查这笔交易是否已经"成熟"(即并非挖到的比特币马上就可以用于消费)，
+                必须要大于COINBASE_MATURITY个区块
+            */
             // If prev is coinbase, check that it's matured
             if (txPrev.IsCoinBase())
                 for (CBlockIndex* pindex = pindexBest; pindex && nBestHeight - pindex->nHeight < COINBASE_MATURITY-1; pindex = pindex->pprev)
                     if (pindex->nBlockPos == txindex.pos.nBlockPos && pindex->nFile == txindex.pos.nFile)
                         return error("ConnectInputs() : tried to spend coinbase at depth %d", nBestHeight - pindex->nHeight);
 
+            // @up4dev 验证签名
             // Verify signature
             if (!VerifySignature(txPrev, *this, i))
                 return error("ConnectInputs() : %s VerifySignature failed", GetHash().ToString().substr(0,6).c_str());
-
+            
+            // @up4dev 已经在txindex.vSpent中出现过，代表该输入已经被用过，出现了冲突
             // Check for conflicts
             if (!txindex.vSpent[prevout.n].IsNull())
                 return fMiner ? false : error("ConnectInputs() : %s prev tx already used at %s", GetHash().ToString().substr(0,6).c_str(), txindex.vSpent[prevout.n].ToString().c_str());
 
+            // @up4dev 标记这笔输入已经被花费
             // Mark outpoints as spent
             txindex.vSpent[prevout.n] = posThisTx;
 
+            // @up4dev 写回这笔支出，接收区块的情况写回磁盘，挖矿的情况写回mapTestPool数据结构
             // Write back
             if (fBlock)
                 txdb.UpdateTxIndex(prevout.hash, txindex);
             else if (fMiner)
                 mapTestPool[prevout.hash] = txindex;
-
+            // @up4dev 计算输入金额
             nValueIn += txPrev.vout[prevout.n].nValue;
         }
 
+        // @up4dev 总输入 - 总输出 = 交易费
         // Tally transaction fees
         int64 nTxFee = nValueIn - GetValueOut();
+        // @up4dev 交易费不能为负
         if (nTxFee < 0)
             return error("ConnectInputs() : %s nTxFee < 0", GetHash().ToString().substr(0,6).c_str());
+        // @up4dev 交易费不能小于规定的最小值
         if (nTxFee < nMinFee)
             return false;
         nFees += nTxFee;
@@ -883,12 +912,14 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, map<uint256, CTxIndex>& mapTestPoo
 
     if (fBlock)
     {
+        // @up4dev 接受区块的情况下写入磁盘的DB
         // Add transaction to disk index
         if (!txdb.AddTxIndex(*this, posThisTx, nHeight))
             return error("ConnectInputs() : AddTxPos failed");
     }
     else if (fMiner)
     {
+        // @up4dev 挖矿的情况下记入内存的测试池mapTestPool
         // Add transaction to test pool
         mapTestPool[GetHash()] = CTxIndex(CDiskTxPos(1,1,1), vout.size());
     }
@@ -2450,6 +2481,7 @@ void BitcoinMiner()
                     if (tx.IsCoinBase() || !tx.IsFinal())
                         continue;
 
+                    // @up4dev 获取交易费(最少需要多少)，小于10k的前100个交易是免费的，费率是0.01/kb
                     // Transaction fee requirements, mainly only needed for flood control
                     // Under 10K (about 80 inputs) is free for first 100 transactions
                     // Base rate is 0.01 per KB
@@ -2468,6 +2500,7 @@ void BitcoinMiner()
             }
         }
         pblock->nBits = nBits;
+        // @up4dev 计算本区块的挖矿奖励
         pblock->vtx[0].vout[0].nValue = pblock->GetBlockValue(nFees);
         printf("Running BitcoinMiner with %d transactions in block\n", pblock->vtx.size());
 

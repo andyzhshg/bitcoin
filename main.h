@@ -155,7 +155,7 @@ class COutPoint
 {
 public:
     uint256 hash;
-    unsigned int n;
+    unsigned int n;     // TODO 需要进一步确认
 
     COutPoint() { SetNull(); }
     COutPoint(uint256 hashIn, unsigned int nIn) { hash = hashIn; n = nIn; }
@@ -514,6 +514,7 @@ public:
         return nCredit;
     }
 
+    // @up4dev 计算交易的所有输出的总额度
     int64 GetValueOut() const
     {
         int64 nValueOut = 0;

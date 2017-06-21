@@ -1278,7 +1278,7 @@ bool SignSignature(const CTransaction& txFrom, CTransaction& txTo, unsigned int 
     return true;
 }
 
-
+// @up4dev 验证签名
 bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, int nHashType)
 {
     assert(nIn < txTo.vin.size());
