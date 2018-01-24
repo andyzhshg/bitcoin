@@ -86,6 +86,7 @@ vector<unsigned char> GenerateNewKey()
 // mapWallet
 //
 
+// @up4dev 记录交易到本地的钱包
 bool AddToWallet(const CWalletTx& wtxIn)
 {
     uint256 hash = wtxIn.GetHash();
@@ -142,6 +143,7 @@ bool AddToWallet(const CWalletTx& wtxIn)
     return true;
 }
 
+// @up4dev 如果是自己的交易，记录到钱包
 bool AddToWalletIfMine(const CTransaction& tx, const CBlock* pblock)
 {
     if (tx.IsMine() || mapWallet.count(tx.GetHash()))
@@ -155,6 +157,7 @@ bool AddToWalletIfMine(const CTransaction& tx, const CBlock* pblock)
     return true;
 }
 
+// @up4dev 从钱包中抹除
 bool EraseFromWallet(uint256 hash)
 {
     CRITICAL_BLOCK(cs_mapWallet)

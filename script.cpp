@@ -1191,7 +1191,7 @@ bool Solver(const CScript& scriptPubKey, uint256 hash, int nHashType, CScript& s
     return true;
 }
 
-
+// @up4dev 检查是否是自己的签名
 bool IsMine(const CScript& scriptPubKey)
 {
     CScript scriptSig;

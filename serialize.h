@@ -463,6 +463,12 @@ void Unserialize(Stream& is, basic_string<C>& str, int, int)
 //
 // vector
 //
+/*
+    @up4dev
+    这里有一个小技巧，利用boost::is_fundamental来区分vector中的元素是基础类型(字符/整数/浮点数等)还是对象，
+    如果是基础类型，则调用boost::true_type的版本，否则调用boost::false_type的版本。
+    以下的序列化反序列化函数都是按照这个套路来实现的，不再进一步说明
+*/
 template<typename T, typename A>
 unsigned int GetSerializeSize_impl(const std::vector<T, A>& v, int nType, int nVersion, const boost::true_type&)
 {
@@ -515,6 +521,13 @@ void Unserialize_impl(Stream& is, std::vector<T, A>& v, int nType, int nVersion,
     //v.resize(nSize);
     //is.read((char*)&v[0], nSize * sizeof(T));
 
+    /*
+        @up4dev
+        这里需要关注v.resize，
+        这里没有一次性的读取所有数组元素(这样就不用调用v.resize了，也就是上边被注释掉的3行代码)，
+        而是blk个元素一次，并且显示的调用v.resize，是因为大部分编译器的vector实现中内存分配
+        策略是以加倍的形式分配的，这有可能会造成内存的不必要浪费。
+    */
     // Limit size per read so bogus size value won't cause out of memory
     v.clear();
     unsigned int nSize = ReadCompactSize(is);
