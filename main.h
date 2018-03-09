@@ -453,7 +453,7 @@ public:
         @up4dev
         检查是否是CoinBase
         (参考)[https://en.bitcoin.it/wiki/Coinbase]
-        CoinBase是指没有输入tx的的tx，也就是区块构建者挖出区块的奖励
+        CoinBase是指没有输入tx的的tx，也就是区块构建者挖出区块的奖励 
     */
     bool IsCoinBase() const
     {
